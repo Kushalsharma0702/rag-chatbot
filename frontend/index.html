@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic RAG Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h2 {
+      color: #333;
+    }
+
+    #chat-box {
+      width: 100%;
+      max-width: 600px;
+      height: 400px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      overflow-y: auto;
+      padding: 10px;
+      margin-bottom: 10px;
+      white-space: pre-wrap; /* preserve formatting */
+    }
+
+    .message {
+      margin: 8px 0;
+    }
+
+    .user {
+      text-align: right;
+      color: blue;
+    }
+
+    .bot {
+      text-align: left;
+      color: green;
+    }
+
+    #input-box {
+      display: flex;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    #user-input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    #send-btn {
+      padding: 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      margin-left: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #otp-popup {
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border: 2px solid #007bff;
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+
+    #otp-popup button {
+      margin-top: 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Agentic RAG Chatbot</h2>
+  <div id="chat-box"></div>
+
+  <div id="input-box">
+    <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" />
+    <button id="send-btn">Send</button>
+  </div>
+
+  <div id="otp-popup">
+    <strong>OTP:</strong> <span id="otp-text"></span><br />
+    <button onclick="closeOTP()">Close</button>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById("chat-box");
+    const userInput = document.getElementById("user-input");
+    const sendBtn = document.getElementById("send-btn");
+    const otpPopup = document.getElementById("otp-popup");
+    const otpText = document.getElementById("otp-text");
+
+    function appendMessage(sender, text) {
+      const msg = document.createElement("div");
+      msg.classList.add("message", sender);
+
+      // Replace markdown bullets with • and preserve newlines with <br>
+      let formattedText = text
+        .replace(/^### (.+)$/gm, '<strong>$1</strong>')  // Bold heading line starting with ###
+        .replace(/\n/g, "<br>")
+        .replace(/\* /g, "• ");
+
+      msg.innerHTML = formattedText;
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function closeOTP() {
+      otpPopup.style.display = "none";
+    }
+
+    // Show OTP popup with OTP text
+    function showOTP(otp) {
+      otpText.textContent = otp;
+      otpPopup.style.display = "block";
+    }
+
+    async function sendMessage() {
+      const message = userInput.value.trim();
+      if (!message) return;
+
+      appendMessage("user", message);
+      userInput.value = "";
+
+      const response = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+
+      const data = await response.json();
+      appendMessage("bot", data.reply);
+
+      // If OTP is generated, show it in popup
+      if (data.reply.includes("OTP generated:")) {
+        // Extract OTP from message
+        const match = data.reply.match(/OTP generated:\s*(\d{4})/);
+        if (match) {
+          showOTP(match[1]);
+        }
+      }
+
+      // Close OTP popup if instructed by backend
+      if (data.close_otp) {
+        closeOTP();
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    userInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    // Start chat with greeting message
+    async function startChat() {
+      const response = await fetch("/start");
+      const data = await response.json();
+      appendMessage("bot", data.reply);
+    }
+
+    startChat();
+  </script>
+
+</body>
+</html>
